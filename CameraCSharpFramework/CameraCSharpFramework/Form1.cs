@@ -19,6 +19,7 @@ using Accord.Video.FFMPEG;
 using System.Threading;
 using System.Data.SqlClient;
 using Newtonsoft.Json.Linq;
+using System.Xml;
 
 namespace CameraCSharpFramework
 {
@@ -37,7 +38,8 @@ namespace CameraCSharpFramework
         //Connection du client
         private List<TcpClient> connectedClients = new List<TcpClient>();
         //connection à la BD
-        string connectionString = "Server=PAUM;Database=maison_connecte;User Id=userMaison;Password=123Maison.;";
+        //string connectionString = "Server=PAUM;Database=maison_connecte;User Id=userMaison;Password=123Maison.;";
+        string connectionString = "Server=MAXIME_PAULIN\\SQLEXPRESS;Database=maison_connecte;User Id=userMaison;Password=123Maison.;";
         //Calcule le nombre de frame a enregistré
         private int recordedFrames = 0;
         private const int framesPerSecond = 30;
@@ -56,8 +58,7 @@ namespace CameraCSharpFramework
 
                 // Execute a simple query
                 var context = new maison_connecteEntities();
-                var listeEnregistrement = context.enregistrements
-                                                  .ToList();
+                var listeEnregistrement = context.enregistrements.ToList();
                 foreach (var e in listeEnregistrement)
                 {
                     Debug.WriteLine(e.id.ToString() + "-" + BitConverter.ToString((byte[])e.flux_video).Replace("-", "") + "-" + e.date.ToString());
@@ -269,7 +270,26 @@ namespace CameraCSharpFramework
             {
                 StopRecording();
                 byte[] videoBytes = GetVideoBytes(nomVideo);
-                Debug.WriteLine(BitConverter.ToString((byte[])videoBytes).Replace("-", ""));
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+
+                    // Execute a simple query
+                    var context = new maison_connecteEntities();
+
+                    // Create a new enregistrements object
+                    var newRecord = new enregistrement
+                    {
+                        flux_video = videoBytes,
+                        date = DateTime.Now,
+                    };
+
+                    // Add the new enregistrements object to the enregistrements DbSet
+                    context.enregistrements.Add(newRecord);
+
+                    // Save changes to the database
+                    context.SaveChanges();
+                }
                 try
                 {
                     File.Delete(nomVideo);
