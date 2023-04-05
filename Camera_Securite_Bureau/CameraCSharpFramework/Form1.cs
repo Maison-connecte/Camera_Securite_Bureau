@@ -244,7 +244,7 @@ namespace CameraCSharpFramework
         public static void Broadcast()
         {
             Debug.WriteLine("broadcasting");
-            byte[] messageBytes = Encoding.ASCII.GetBytes("test");
+            byte[] messageBytes = Encoding.ASCII.GetBytes(imageBase64);
 
             lock (_syncLock)
             {
