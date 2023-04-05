@@ -13,10 +13,10 @@ namespace CameraCSharpFramework
     using System.Data.Entity;
     using System.Data.Entity.Infrastructure;
     
-    public partial class maison_connecteEntities : DbContext
+    public partial class MaisonConnecteEntities : DbContext
     {
-        public maison_connecteEntities()
-            : base("name=maison_connecteEntities")
+        public MaisonConnecteEntities()
+            : base("name=MaisonConnecteEntities")
         {
         }
     
@@ -25,6 +25,6 @@ namespace CameraCSharpFramework
             throw new UnintentionalCodeFirstException();
         }
     
-        public virtual DbSet<enregistrement> enregistrements { get; set; }
+        public virtual DbSet<enregistrement> enregistrement { get; set; }
     }
 }

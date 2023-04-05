@@ -9,7 +9,6 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using SimpleTCP;
 using System.Net.Sockets;
 using System.Drawing.Imaging;
 using System.IO;
@@ -20,13 +19,14 @@ using System.Threading;
 using System.Data.SqlClient;
 using Newtonsoft.Json.Linq;
 using System.Xml;
+using Microsoft.Extensions.Configuration;
+using System.Data.Entity;
+using System.Net;
 
 namespace CameraCSharpFramework
 {
     public partial class Form1 : Form
     {
-        //socket pour parler entre le site web et l'application
-        private SimpleTcpServer serverSocket;
         //variable pour dire aux thread du socket darreter de fonctionner
         private CancellationTokenSource broadcastCancellationTokenSource;
         //Trouve les cameras sur l'ordinateur
@@ -34,12 +34,14 @@ namespace CameraCSharpFramework
         //driver directShow
         private VideoCaptureDevice videoCaptureDevice;
         //donné à envoyer au socket
-        private string imageBase64 = string.Empty;
+        private static string imageBase64 = string.Empty;
         //Connection du client
-        private List<TcpClient> connectedClients = new List<TcpClient>();
+        private static List<ClientConnection> clients = new List<ClientConnection>();
         //connection à la BD
+        string connectionString = "Server=PAUM;Database=maison_connecte;User Id=userMaison;Password=123Maison.;";
+        //string connectionString = "Server=MAXIME_PAULIN\\SQLEXPRESS;Database=maison_connecte;User Id=userMaison;Password=123Maison.;"
         //string connectionString = "Server=PAUM;Database=maison_connecte;User Id=userMaison;Password=123Maison.;";
-        string connectionString = "Server=MAXIME_PAULIN\\SQLEXPRESS;Database=maison_connecte;User Id=userMaison;Password=123Maison.;";
+        //string connectionString = "Server=localhost;User ID=thugapy;Password=testpw;Database=MaisonConnecte;Trusted_Connection=False;Encrypt=False";
         //Calcule le nombre de frame a enregistré
         private int recordedFrames = 0;
         private const int framesPerSecond = 30;
@@ -49,7 +51,9 @@ namespace CameraCSharpFramework
         private VideoFileWriter videoFileWriter;
         private string nomVideo = "temp.mp4";
         private bool videoFiniEnregistre = false;
-        
+
+        private static readonly object _syncLock = new object();
+
         private void dbConnection()
         {
             using (SqlConnection connection = new SqlConnection(connectionString))
@@ -57,8 +61,8 @@ namespace CameraCSharpFramework
                 connection.Open();
 
                 // Execute a simple query
-                var context = new maison_connecteEntities();
-                var listeEnregistrement = context.enregistrements.ToList();
+                var context = new MaisonConnecteEntities();
+                var listeEnregistrement = context.enregistrement.ToList();
                 foreach (var e in listeEnregistrement)
                 {
                     Debug.WriteLine(e.id.ToString() + "-" + BitConverter.ToString((byte[])e.flux_video).Replace("-", "") + "-" + e.date.ToString());
@@ -106,12 +110,6 @@ namespace CameraCSharpFramework
                 videoCaptureDevice.SignalToStop();
                 videoCaptureDevice.WaitForStop();
                 videoCaptureDevice = null;
-            }
-
-            if (serverSocket != null)
-            {
-                serverSocket.Stop();
-                serverSocket = null;
             }
 
             if (videoFileWriter != null)
@@ -175,63 +173,87 @@ namespace CameraCSharpFramework
 
             serverSocket.Broadcast(base64);*/
         }
-
-        private void Broadcast()
+        public static void Broadcast()
         {
-            foreach (TcpClient client in connectedClients)
+            Debug.WriteLine("broadcasting");
+            byte[] messageBytes = Encoding.ASCII.GetBytes(imageBase64);
+            //Debug.WriteLine(messageBytes);
+
+            lock (_syncLock)
             {
-                byte[] data = System.Text.Encoding.ASCII.GetBytes(imageBase64);
-                client.GetStream().Write(data, 0, data.Length);
+                foreach (ClientConnection connection in clients)
+                {
+                    try
+                    {
+                        connection.ClientSocket.Send(messageBytes);
+                    }
+                    catch (SocketException)
+                    {
+                        HandleClientConnection(connection);
+                        // Handle socket exceptions (e.g., connection closed)
+                    }
+                }
             }
         }
+
+        private static void HandleClientConnection(ClientConnection connection)
+        {
+            // Handle the client connection here
+            // (e.g., receive data, process requests, etc.)
+            // This example only shows broadcasting a string to clients
+
+            // Cleanup
+            //Debug.WriteLine("remove client");
+            connection.ClientSocket.Close();
+            lock (_syncLock)
+            {
+                clients.Remove(connection);
+            }
+        }
+
 
         private void CreateSocket()
         {
             Debug.WriteLine("Socket created");
-
-            serverSocket = new SimpleTcpServer().Start(8010);
-            serverSocket.StringEncoder = System.Text.Encoding.ASCII;
-            serverSocket.ClientConnected += OnClientConnect;
-            serverSocket.ClientDisconnected += (sender, client) =>
-            {
-                connectedClients.Remove(client);
-            };
-
-            serverSocket.Delimiter = 0x32;
-
             broadcastCancellationTokenSource = new CancellationTokenSource();
             var token = broadcastCancellationTokenSource.Token;
 
-            //serverSocket.DataReceived += ServerSocket_DataReceived;
             Task.Run(() =>
+            {
+                int port = 8010;
+                IPAddress ipAddress = IPAddress.Any;
+
+                Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                IPEndPoint localEndPoint = new IPEndPoint(ipAddress, port);
+                serverSocket.Bind(localEndPoint);
+                serverSocket.Listen(10);
+
+                Debug.WriteLine($"Server is listening on {ipAddress}:{port}");
+
+                while (true)
+                {
+                    Socket clientSocket = serverSocket.Accept();
+                    Debug.WriteLine("Client connected.");
+
+                    ClientConnection connection = new ClientConnection { ClientSocket = clientSocket };
+
+                    lock (_syncLock)
+                    {
+                        clients.Add(connection);
+                    }
+                }
+            });
+
+            //serverSocket.DataReceived += ServerSocket_DataReceived;
+            Task.Run(async () =>
             {
                 while (!token.IsCancellationRequested)
                 {
                     Broadcast();
+                    await Task.Delay(1000 / 30);
                 }
-            }, token);
+            });
         }
-
-        private void OnClientConnect(object sender, TcpClient e)
-        {
-            Debug.WriteLine("client connected");
-            connectedClients.Add(e);
-
-            //Task.Run(() =>
-            //{
-            //    while(true)
-            //    {
-            //        IPEndPoint ip = (IPEndPoint)e.Client.RemoteEndPoint;
-            //        Debug.WriteLine("Sent data to " + ip.ToString());
-            //        Task.Run(() =>
-            //        {
-            //            e.Client.SendAsync(GetImageBytes());
-            //        });
-            //        //e.Client.Send(GetImageBytes());
-            //    }
-            //});
-        }
-
         private void button1_Click(object sender, EventArgs e)
         {
             //videoCaptureDevice = new VideoCaptureDevice(videoDevices[comboBox1.SelectedIndex].MonikerString);
@@ -275,7 +297,7 @@ namespace CameraCSharpFramework
                     connection.Open();
 
                     // Execute a simple query
-                    var context = new maison_connecteEntities();
+                    var context = new MaisonConnecteEntities();
 
                     // Create a new enregistrements object
                     var newRecord = new enregistrement
@@ -285,7 +307,7 @@ namespace CameraCSharpFramework
                     };
 
                     // Add the new enregistrements object to the enregistrements DbSet
-                    context.enregistrements.Add(newRecord);
+                    context.enregistrement.Add(newRecord);
 
                     // Save changes to the database
                     context.SaveChanges();
