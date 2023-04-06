@@ -2,10 +2,7 @@
 using Accord.Video;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
 using System.Drawing;
-using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -17,11 +14,9 @@ using System.Timers;
 using Accord.Video.FFMPEG;
 using System.Threading;
 using System.Data.SqlClient;
-using Newtonsoft.Json.Linq;
-using System.Xml;
-using Microsoft.Extensions.Configuration;
-using System.Data.Entity;
 using System.Net;
+using System.Linq;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace CameraCSharpFramework
 {
@@ -38,37 +33,27 @@ namespace CameraCSharpFramework
         //Connection du client
         private static List<ClientConnection> clients = new List<ClientConnection>();
         //connection à la BD
-        string connectionString = "Server=PAUM;Database=maison_connecte;User Id=userMaison;Password=123Maison.;";
+        string connectionString = "Server=PAUM\\PAUM;Database=maison_connecte;User Id=userMaison;Password=123Maison.;";
         //string connectionString = "Server=MAXIME_PAULIN\\SQLEXPRESS;Database=maison_connecte;User Id=userMaison;Password=123Maison.;"
         //string connectionString = "Server=PAUM;Database=maison_connecte;User Id=userMaison;Password=123Maison.;";
         //string connectionString = "Server=localhost;User ID=thugapy;Password=testpw;Database=MaisonConnecte;Trusted_Connection=False;Encrypt=False";
         //Calcule le nombre de frame a enregistré
         private int recordedFrames = 0;
         private const int framesPerSecond = 30;
-        private const int desiredVideoLengthSeconds = 1 * 60; // 5 minutes in seconds
+        private const int desiredVideoLengthSeconds = 1 * 10; // 5 minutes in seconds
         private const int totalFramesToRecord = framesPerSecond * desiredVideoLengthSeconds;
+        private int pictureBoxWidth = 0;
+        private int pictureBoxHeight = 0;
+
 
         private VideoFileWriter videoFileWriter;
         private string nomVideo = "temp.mp4";
         private bool videoFiniEnregistre = false;
+        //quand recois message MQTT mettre true
+        private bool videoRecording = false;
 
         private static readonly object _syncLock = new object();
 
-        private void dbConnection()
-        {
-            using (SqlConnection connection = new SqlConnection(connectionString))
-            {
-                connection.Open();
-
-                // Execute a simple query
-                var context = new MaisonConnecteEntities();
-                var listeEnregistrement = context.enregistrement.ToList();
-                foreach (var e in listeEnregistrement)
-                {
-                    Debug.WriteLine(e.id.ToString() + "-" + BitConverter.ToString((byte[])e.flux_video).Replace("-", "") + "-" + e.date.ToString());
-                }
-            }
-        }
         public Form1()
         {
             InitializeComponent();
@@ -76,10 +61,8 @@ namespace CameraCSharpFramework
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            // Initialize VideoFileWriter
-            videoFileWriter = new VideoFileWriter();
-            StartRecording();
-            dbConnection();
+            pictureBoxWidth = pictureBox1.Width;
+            pictureBoxHeight = pictureBox1.Height;
             videoDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
 
             foreach (FilterInfo filterInfo in videoDevices)
@@ -101,6 +84,8 @@ namespace CameraCSharpFramework
             videoCaptureDevice = new VideoCaptureDevice(videoDevices[0].MonikerString);
             videoCaptureDevice.NewFrame += new NewFrameEventHandler(VideoCaptureDevice_NewFrame);
             videoCaptureDevice.Start();
+            // Initialize VideoFileWriter
+            videoFileWriter = new VideoFileWriter();
         }
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
@@ -131,10 +116,12 @@ namespace CameraCSharpFramework
             Debug.WriteLine(pictureBox1.Width);
             Debug.WriteLine(pictureBox1.Height);
 
-            videoFileWriter.Open(outputFilePath, 1008, 612, framesPerSecond, VideoCodec.Default, 1000000/2);
+            videoFileWriter.Open(outputFilePath, 640, 480, framesPerSecond, VideoCodec.Default, 1000000);
 
             // Reset the recordedFrames counter
             recordedFrames = 0;
+            videoRecording = true;
+            videoFiniEnregistre = false;
         }
 
 
@@ -176,8 +163,11 @@ namespace CameraCSharpFramework
         public static void Broadcast()
         {
             Debug.WriteLine("broadcasting");
-            byte[] messageBytes = Encoding.ASCII.GetBytes(imageBase64);
-            //Debug.WriteLine(messageBytes);
+
+            // Add the "---END_OF_FRAME---" delimiter to imageBase64
+            string imageBase64WithDelimiter = imageBase64 + "---END_OF_FRAME---";
+
+            byte[] messageBytes = Encoding.ASCII.GetBytes(imageBase64WithDelimiter);
 
             lock (_syncLock)
             {
@@ -190,11 +180,11 @@ namespace CameraCSharpFramework
                     catch (SocketException)
                     {
                         HandleClientConnection(connection);
-                        // Handle socket exceptions (e.g., connection closed)
                     }
                 }
             }
         }
+
 
         private static void HandleClientConnection(ClientConnection connection)
         {
@@ -256,15 +246,21 @@ namespace CameraCSharpFramework
         }
         private void button1_Click(object sender, EventArgs e)
         {
-            //videoCaptureDevice = new VideoCaptureDevice(videoDevices[comboBox1.SelectedIndex].MonikerString);
-            //videoCaptureDevice.NewFrame += new NewFrameEventHandler(VideoCaptureDevice_NewFrame);
-            //videoCaptureDevice.Start();
-            Debug.WriteLine("start video");
+            if (videoCaptureDevice != null && videoCaptureDevice.IsRunning)
+            {
+                videoCaptureDevice.SignalToStop();
+                videoCaptureDevice.WaitForStop();
+                videoCaptureDevice = null;
+            }
+            videoCaptureDevice = new VideoCaptureDevice(videoDevices[comboBox1.SelectedIndex].MonikerString);
+            videoCaptureDevice.NewFrame += new NewFrameEventHandler(VideoCaptureDevice_NewFrame);
+            videoCaptureDevice.Start();
             StartRecording();
         }
         private void StopRecording()
         {
             videoFiniEnregistre = true;
+            videoRecording = false;
             // Close the VideoFileWriter instance
             videoFileWriter.Close();
 
@@ -288,50 +284,21 @@ namespace CameraCSharpFramework
             Bitmap image = (Bitmap)eventArgs.Frame.Clone();
 
             // Stop recording after reaching the desired number of frames
-            if (recordedFrames == totalFramesToRecord && videoFiniEnregistre == false)
+            if (recordedFrames == totalFramesToRecord && videoFiniEnregistre == false && videoRecording == true)
             {
                 StopRecording();
-                byte[] videoBytes = GetVideoBytes(nomVideo);
-                using (SqlConnection connection = new SqlConnection(connectionString))
+                Task.Run(() =>
                 {
-                    connection.Open();
-
-                    // Execute a simple query
-                    var context = new MaisonConnecteEntities();
-
-                    // Create a new enregistrements object
-                    var newRecord = new enregistrement
-                    {
-                        flux_video = videoBytes,
-                        date = DateTime.Now,
-                    };
-
-                    // Add the new enregistrements object to the enregistrements DbSet
-                    context.enregistrement.Add(newRecord);
-
-                    // Save changes to the database
-                    context.SaveChanges();
-                }
-                try
-                {
-                    File.Delete(nomVideo);
-                    Debug.WriteLine("File deleted successfully.");
-                }
-                catch (IOException ex)
-                {
-                    Debug.WriteLine($"Error deleting file: {ex.Message}");
-                }
+                    sauvegardeVideoDansBD();
+                });  
             }
 
-            if (videoFiniEnregistre == false)
+            if (videoFiniEnregistre == false && videoRecording == true)
             {
                 recordedFrames++;
                 // Save frames to the VideoFileWriter while capturing frames
                 videoFileWriter.WriteVideoFrame(image);
             }
-
-            int pictureBoxWidth = pictureBox1.Width;
-            int pictureBoxHeight = pictureBox1.Height;
 
             Bitmap resizedImage = new Bitmap(pictureBoxWidth, pictureBoxHeight);
 
@@ -340,6 +307,16 @@ namespace CameraCSharpFramework
                 graphics.DrawImage(image, 0, 0, pictureBoxWidth, pictureBoxHeight);
             }
 
+            Task.Run(() =>
+            {
+                conversionToBase64(image);
+            });
+
+            pictureBox1.Image?.Dispose();
+            pictureBox1.Image = resizedImage;
+        }
+        private void conversionToBase64(Bitmap image)
+        {
             MemoryStream ms = new MemoryStream();
             image.Save(ms, ImageFormat.Jpeg);
 
@@ -349,10 +326,40 @@ namespace CameraCSharpFramework
             byte[] utf8bytes = System.Text.Encoding.UTF8.GetBytes(base64string);
 
             imageBase64 = System.Text.Encoding.ASCII.GetString(utf8bytes);
+        }
 
-            pictureBox1.Image = resizedImage;
-            image.Dispose();
+        private void sauvegardeVideoDansBD()
+        {
+            byte[] videoBytes = GetVideoBytes(nomVideo);
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                connection.Open();
 
+                // Execute a simple query
+                var context = new MaisonConnecteEntities();
+
+                // Create a new enregistrements object
+                var newRecord = new enregistrement
+                {
+                    flux_video = videoBytes,
+                    date = DateTime.Now,
+                };
+
+                // Add the new enregistrements object to the enregistrements DbSet
+                context.enregistrement.Add(newRecord);
+
+                // Save changes to the database
+                context.SaveChanges();
+            }
+            try
+            {
+                File.Delete(nomVideo);
+                Debug.WriteLine("File deleted successfully.");
+            }
+            catch (IOException ex)
+            {
+                Debug.WriteLine($"Error deleting file: {ex.Message}");
+            }
         }
     }
 }
