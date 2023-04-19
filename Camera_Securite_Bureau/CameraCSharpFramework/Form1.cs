@@ -162,17 +162,23 @@ namespace CameraCSharpFramework
         }
         public static void Broadcast()
         {
-            Debug.WriteLine("broadcasting");
+            //Debug.WriteLine("broadcasting");
 
             // Add the "---END_OF_FRAME---" delimiter to imageBase64
             string imageBase64WithDelimiter = imageBase64 + "---END_OF_FRAME---";
 
             byte[] messageBytes = Encoding.ASCII.GetBytes(imageBase64WithDelimiter);
+            ClientConnection connection;
 
             lock (_syncLock)
             {
-                foreach (ClientConnection connection in clients)
+                for (int i = 0; i < clients.Count; i++)
                 {
+                    if (i >= clients.Count)
+                    {
+                        continue;
+                    }
+                    connection = clients[i];
                     try
                     {
                         connection.ClientSocket.Send(messageBytes);
@@ -188,6 +194,7 @@ namespace CameraCSharpFramework
 
         private static void HandleClientConnection(ClientConnection connection)
         {
+            Debug.WriteLine($"Client connection: {connection}");
             // Handle the client connection here
             // (e.g., receive data, process requests, etc.)
             // This example only shows broadcasting a string to clients
@@ -361,5 +368,7 @@ namespace CameraCSharpFramework
                 Debug.WriteLine($"Error deleting file: {ex.Message}");
             }
         }
+
+
     }
 }
