@@ -22,6 +22,8 @@ namespace CameraCSharpFramework
 {
     public partial class Form1 : Form
     {
+        private Bitmap image;
+        private Bitmap resizedImage;
         //variable pour dire aux thread du socket darreter de fonctionner
         private CancellationTokenSource broadcastCancellationTokenSource;
         //Trouve les cameras sur l'ordinateur
@@ -75,12 +77,6 @@ namespace CameraCSharpFramework
 
             CreateSocket();
 
-            System.Timers.Timer timer = new System.Timers.Timer();
-            timer.AutoReset = true;
-            timer.Interval = 1000 / 30;
-            timer.Elapsed += SocketElapsed;
-            timer.Start();
-
             videoCaptureDevice = new VideoCaptureDevice(videoDevices[0].MonikerString);
             videoCaptureDevice.NewFrame += new NewFrameEventHandler(VideoCaptureDevice_NewFrame);
             videoCaptureDevice.Start();
@@ -104,10 +100,7 @@ namespace CameraCSharpFramework
             }
 
             StopBroadcastTask();
-            debugThread();
         }
-
-
 
         private void StartRecording()
         {
@@ -123,7 +116,6 @@ namespace CameraCSharpFramework
             videoRecording = true;
             videoFiniEnregistre = false;
         }
-
 
         private void debugThread()
         {
@@ -143,22 +135,6 @@ namespace CameraCSharpFramework
                 broadcastCancellationTokenSource.Dispose();
                 broadcastCancellationTokenSource = null;
             }
-        }
-
-        private void SocketElapsed(object source = null, ElapsedEventArgs e = null)
-        {
-            //Debug.WriteLine("broadcast");
-
-            /*Bitmap b = (Bitmap)Bitmap.FromFile("C:\\Users\\poij\\Desktop\\images test/rl.jpg");
-
-            MemoryStream ms = new MemoryStream();
-            b.Save(ms, ImageFormat.Png);
-
-            byte[] imageBytes = ms.ToArray();
-
-            string base64 = Convert.ToBase64String(imageBytes);
-
-            serverSocket.Broadcast(base64);*/
         }
         public static void Broadcast()
         {
@@ -287,8 +263,7 @@ namespace CameraCSharpFramework
 
         private void VideoCaptureDevice_NewFrame(object sender, NewFrameEventArgs eventArgs)
         {
-            //Debug.WriteLine("new frame");
-            Bitmap image = (Bitmap)eventArgs.Frame.Clone();
+            image = (Bitmap)eventArgs.Frame.Clone();
 
             // Stop recording after reaching the desired number of frames
             if (recordedFrames == totalFramesToRecord && videoFiniEnregistre == false && videoRecording == true)
@@ -307,7 +282,7 @@ namespace CameraCSharpFramework
                 videoFileWriter.WriteVideoFrame(image);
             }
 
-            Bitmap resizedImage = new Bitmap(pictureBoxWidth, pictureBoxHeight);
+            resizedImage = new Bitmap(pictureBoxWidth, pictureBoxHeight);
 
             using (Graphics graphics = Graphics.FromImage(resizedImage))
             {
@@ -318,21 +293,25 @@ namespace CameraCSharpFramework
             {
                 conversionToBase64(image);
             });
-
+                   
             pictureBox1.Image?.Dispose();
             pictureBox1.Image = resizedImage;
+          
         }
         private void conversionToBase64(Bitmap image)
         {
-            MemoryStream ms = new MemoryStream();
-            image.Save(ms, ImageFormat.Jpeg);
+            using (MemoryStream ms = new MemoryStream())
+            {
+                image.Save(ms, ImageFormat.Jpeg);
 
-            byte[] imageBytes = ms.ToArray();
+                byte[] imageBytes = ms.ToArray();
 
-            string base64string = Convert.ToBase64String(imageBytes);
-            byte[] utf8bytes = System.Text.Encoding.UTF8.GetBytes(base64string);
+                string base64string = Convert.ToBase64String(imageBytes);
+                byte[] utf8bytes = System.Text.Encoding.UTF8.GetBytes(base64string);
 
-            imageBase64 = System.Text.Encoding.ASCII.GetString(utf8bytes);
+                imageBase64 = System.Text.Encoding.ASCII.GetString(utf8bytes);
+            }
+            image.Dispose();
         }
 
         private void sauvegardeVideoDansBD()
