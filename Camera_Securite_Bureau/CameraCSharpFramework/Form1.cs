@@ -10,18 +10,26 @@ using System.Net.Sockets;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Diagnostics;
-using System.Timers;
 using Accord.Video.FFMPEG;
 using System.Threading;
 using System.Data.SqlClient;
 using System.Net;
-using System.Linq;
-using static System.Net.Mime.MediaTypeNames;
+using MQTTnet;
+using MQTTnet.Client;
+using MQTTnet.Exceptions;
+using MQTTnet.Packets;
+using MQTTnet.Protocol;
 
 namespace CameraCSharpFramework
 {
     public partial class Form1 : Form
     {
+        //constante pour connecté a mqtt et au topic
+        public static string nomServeur = "test.mosquitto.org";
+        public static int portServeur = 1883;
+        private static IMqttClient _mqttClient;
+        private static string nomTopic = "capteur_ultrason";
+        //------------------------------------------------------
         private Bitmap image;
         private Bitmap resizedImage;
         //variable pour dire aux thread du socket darreter de fonctionner
@@ -61,6 +69,51 @@ namespace CameraCSharpFramework
             InitializeComponent();
         }
 
+        public static async Task Subscribe_Topic()
+        {
+            /*
+             * This sample subscribes to a topic.
+             */
+
+            try
+            {
+                var mqttFactory = new MqttFactory();
+                _mqttClient = mqttFactory.CreateMqttClient();
+
+                var mqttClientOptions = new MqttClientOptionsBuilder().WithTcpServer(nomServeur, 1883).Build();
+
+                _mqttClient.ApplicationMessageReceivedAsync += (e) =>
+                {
+                    string receivedMessage = Encoding.UTF8.GetString(e.ApplicationMessage.Payload);
+                    Debug.WriteLine($"Received message from topic '{e.ApplicationMessage.Topic}': {receivedMessage}");
+
+                    return Task.CompletedTask;
+                };
+
+                await _mqttClient.ConnectAsync(mqttClientOptions, CancellationToken.None);
+
+                var mqttSubscribeOptions = mqttFactory.CreateSubscribeOptionsBuilder()
+                    .WithTopicFilter(
+                        f =>
+                        {
+                            f.WithTopic(nomTopic);
+                        })
+                    .Build();
+
+                var response = await _mqttClient.SubscribeAsync(mqttSubscribeOptions, CancellationToken.None);
+
+                Debug.WriteLine("MQTT client subscribed to topic.");
+            }
+            catch (MqttCommunicationException ex)
+            {
+                Debug.WriteLine("An error occurred while communicating with the MQTT broker: " + ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("An error occurred: " + ex.Message);
+            }
+        }
+
         private void Form1_Load(object sender, EventArgs e)
         {
             pictureBoxWidth = pictureBox1.Width;
@@ -82,6 +135,11 @@ namespace CameraCSharpFramework
             videoCaptureDevice.Start();
             // Initialize VideoFileWriter
             videoFileWriter = new VideoFileWriter();
+
+            Task.Run(async () =>
+            {
+                await Subscribe_Topic();
+            });
         }
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
