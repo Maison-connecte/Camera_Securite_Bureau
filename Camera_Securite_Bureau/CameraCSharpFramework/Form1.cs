@@ -42,25 +42,23 @@ namespace CameraCSharpFramework
         private static string imageBase64 = string.Empty;
         //Connection du client
         private static List<ClientConnection> clients = new List<ClientConnection>();
-        //connection à la BD
-        string connectionString = "Server=PAUM\\PAUM;Database=maison_connecte;User Id=userMaison;Password=123Maison.;";
-        //string connectionString = "Server=MAXIME_PAULIN\\SQLEXPRESS;Database=maison_connecte;User Id=userMaison;Password=123Maison.;"
-        //string connectionString = "Server=PAUM;Database=maison_connecte;User Id=userMaison;Password=123Maison.;";
-        //string connectionString = "Server=localhost;User ID=thugapy;Password=testpw;Database=MaisonConnecte;Trusted_Connection=False;Encrypt=False";
+        
         //Calcule le nombre de frame a enregistré
-        private int recordedFrames = 0;
+        private static int recordedFrames = 0;
         private const int framesPerSecond = 30;
         private const int desiredVideoLengthSeconds = 1 * 10; // 5 minutes in seconds
         private const int totalFramesToRecord = framesPerSecond * desiredVideoLengthSeconds;
-        private int pictureBoxWidth = 0;
-        private int pictureBoxHeight = 0;
+        private static int pictureBoxWidth = 0;
+        private static int pictureBoxHeight = 0;
 
-
-        private VideoFileWriter videoFileWriter;
-        private string nomVideo = "temp.mp4";
-        private bool videoFiniEnregistre = false;
+        private static byte[] thumbnail = null;
+        private static bool premierEnregistrement = true;
+        private static VideoFileWriter videoFileWriter;
+        private static string nomVideo = "temp.mp4";
+        private static bool videoFiniEnregistre = false;
         //quand recois message MQTT mettre true
-        private bool videoRecording = false;
+        private static bool videoRecording = false;
+        private static string receivedMessage;
 
         private static readonly object _syncLock = new object();
 
@@ -69,12 +67,9 @@ namespace CameraCSharpFramework
             InitializeComponent();
         }
 
+        //souscrit au topic et va lire les valeurs. Commence l'enregistrement lorsque porte ouverte.
         public static async Task Subscribe_Topic()
         {
-            /*
-             * This sample subscribes to a topic.
-             */
-
             try
             {
                 var mqttFactory = new MqttFactory();
@@ -84,7 +79,7 @@ namespace CameraCSharpFramework
 
                 _mqttClient.ApplicationMessageReceivedAsync += (e) =>
                 {
-                    string receivedMessage = Encoding.UTF8.GetString(e.ApplicationMessage.Payload);
+                    receivedMessage = Encoding.UTF8.GetString(e.ApplicationMessage.Payload);
                     Debug.WriteLine($"Received message from topic '{e.ApplicationMessage.Topic}': {receivedMessage}");
 
                     return Task.CompletedTask;
@@ -160,12 +155,9 @@ namespace CameraCSharpFramework
             StopBroadcastTask();
         }
 
-        private void StartRecording()
+        private static void StartRecording()
         {
             string outputFilePath = nomVideo;
-            // Set up the VideoFileWriter instance
-            Debug.WriteLine(pictureBox1.Width);
-            Debug.WriteLine(pictureBox1.Height);
 
             videoFileWriter.Open(outputFilePath, 640, 480, framesPerSecond, VideoCodec.Default, 1000000);
 
@@ -224,7 +216,6 @@ namespace CameraCSharpFramework
                 }
             }
         }
-
 
         private static void HandleClientConnection(ClientConnection connection)
         {
@@ -323,15 +314,32 @@ namespace CameraCSharpFramework
         {
             image = (Bitmap)eventArgs.Frame.Clone();
 
+            if ((videoFiniEnregistre == true && videoRecording == false && receivedMessage == "1") || premierEnregistrement == true)
+            {
+                premierEnregistrement = false;
+                StartRecording();
+            }
+
             // Stop recording after reaching the desired number of frames
             if (recordedFrames == totalFramesToRecord && videoFiniEnregistre == false && videoRecording == true)
             {
                 StopRecording();
-                Task.Run(() =>
-                {
-                    sauvegardeVideoDansBD();
-                });  
+                sauvegardeVideoDansBD();
             }
+            //rendu à moitier ont enregistre le thumbnail et envois dans BD
+            else if (recordedFrames == (totalFramesToRecord/2))
+            {
+                using (MemoryStream ms = new MemoryStream())
+                {
+                    //sauvegarde l'image dans le buffer
+                    image.Save(ms, ImageFormat.Jpeg);
+
+                    //convertit le memory stream dans un byte array
+                    thumbnail = ms.ToArray();
+                }
+            }
+
+
 
             if (videoFiniEnregistre == false && videoRecording == true)
             {
@@ -346,12 +354,9 @@ namespace CameraCSharpFramework
             {
                 graphics.DrawImage(image, 0, 0, pictureBoxWidth, pictureBoxHeight);
             }
-
-            Task.Run(() =>
-            {
-                conversionToBase64(image);
-            });
-                   
+            
+            conversionToBase64(image);
+                
             pictureBox1.Image?.Dispose();
             pictureBox1.Image = resizedImage;
           
@@ -374,38 +379,32 @@ namespace CameraCSharpFramework
 
         private void sauvegardeVideoDansBD()
         {
-            byte[] videoBytes = GetVideoBytes(nomVideo);
-            using (SqlConnection connection = new SqlConnection(connectionString))
-            {
-                connection.Open();
+                byte[] videoBytes = GetVideoBytes(nomVideo);
 
                 // Execute a simple query
-                var context = new MaisonConnecteEntities();
+                var context = new Maison_connecteEntities();
 
                 // Create a new enregistrements object
                 var newRecord = new enregistrement
                 {
                     flux_video = videoBytes,
-                    date = DateTime.Now,
+                    thumbnail = thumbnail
                 };
 
                 // Add the new enregistrements object to the enregistrements DbSet
-                context.enregistrement.Add(newRecord);
+                context.enregistrements.Add(newRecord);
 
                 // Save changes to the database
                 context.SaveChanges();
-            }
             try
-            {
-                File.Delete(nomVideo);
-                Debug.WriteLine("File deleted successfully.");
-            }
-            catch (IOException ex)
-            {
-                Debug.WriteLine($"Error deleting file: {ex.Message}");
-            }
+                {
+                    File.Delete(nomVideo);
+                    Debug.WriteLine("File deleted successfully.");
+                }
+                catch (IOException ex)
+                {
+                    Debug.WriteLine($"Error deleting file: {ex.Message}");
+                }
         }
-
-
     }
 }
