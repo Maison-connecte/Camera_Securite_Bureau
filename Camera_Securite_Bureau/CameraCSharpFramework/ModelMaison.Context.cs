@@ -13,10 +13,10 @@ namespace CameraCSharpFramework
     using System.Data.Entity;
     using System.Data.Entity.Infrastructure;
     
-    public partial class maison_connecte2Entities : DbContext
+    public partial class maisonConnecteEntities : DbContext
     {
-        public maison_connecte2Entities()
-            : base("name=maison_connecte2Entities")
+        public maisonConnecteEntities()
+            : base("name=maisonConnecteEntities")
         {
         }
     

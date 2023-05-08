@@ -17,6 +17,6 @@ namespace CameraCSharpFramework
         public long id { get; set; }
         public byte[] flux_video { get; set; }
         public byte[] thumbnail { get; set; }
-        public System.DateTime date { get; set; } = DateTime.Now;
+        public System.DateTime date { get; set; }
     }
 }

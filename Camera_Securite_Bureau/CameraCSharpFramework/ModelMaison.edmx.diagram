@@ -4,9 +4,9 @@
   <edmx:Designer xmlns="http://schemas.microsoft.com/ado/2009/11/edmx">
     <!-- Diagram content (shape and connector positions) -->
     <edmx:Diagrams>
-      <Diagram DiagramId="3fbb7c08837d43c887f59bf5fcc2a817" Name="Diagram1">
-        <EntityTypeShape EntityType="maison_connecte2Model.enregistrement" Width="1.5" PointX="0.75" PointY="0.75" IsExpanded="true" />
-        <EntityTypeShape EntityType="maison_connecte2Model.event" Width="1.5" PointX="2.75" PointY="0.75" IsExpanded="true" />
+      <Diagram DiagramId="ae069c98d8504c34a84c8a8717660523" Name="Diagram1">
+        <EntityTypeShape EntityType="maisonConnecteModel.enregistrement" Width="1.5" PointX="0.75" PointY="0.75" IsExpanded="true" />
+        <EntityTypeShape EntityType="maisonConnecteModel.event" Width="1.5" PointX="2.75" PointY="0.75" IsExpanded="true" />
       </Diagram>
     </edmx:Diagrams>
   </edmx:Designer>

@@ -15,8 +15,8 @@ namespace CameraCSharpFramework
     public partial class @event
     {
         public long id { get; set; }
-        public System.DateTime date { get; set; } = DateTime.Now;
+        public System.DateTime date { get; set; }
         public string event1 { get; set; }
-        public string data { get; set; } 
+        public string data { get; set; }
     }
 }

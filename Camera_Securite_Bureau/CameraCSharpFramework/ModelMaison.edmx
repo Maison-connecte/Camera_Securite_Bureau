@@ -4,7 +4,7 @@
   <edmx:Runtime>
     <!-- SSDL content -->
     <edmx:StorageModels>
-    <Schema Namespace="maison_connecte2Model.Store" Provider="System.Data.SqlClient" ProviderManifestToken="2012" Alias="Self" xmlns:store="http://schemas.microsoft.com/ado/2007/12/edm/EntityStoreSchemaGenerator" xmlns:customannotation="http://schemas.microsoft.com/ado/2013/11/edm/customannotation" xmlns="http://schemas.microsoft.com/ado/2009/11/edm/ssdl">
+      <Schema Namespace="maisonConnecteModel.Store" Provider="System.Data.SqlClient" ProviderManifestToken="2012" Alias="Self" xmlns:store="http://schemas.microsoft.com/ado/2007/12/edm/EntityStoreSchemaGenerator" xmlns:customannotation="http://schemas.microsoft.com/ado/2013/11/edm/customannotation" xmlns="http://schemas.microsoft.com/ado/2009/11/edm/ssdl">
         <EntityType Name="enregistrement">
           <Key>
             <PropertyRef Name="id" />
@@ -12,7 +12,7 @@
           <Property Name="id" Type="bigint" StoreGeneratedPattern="Identity" Nullable="false" />
           <Property Name="flux_video" Type="varbinary(max)" Nullable="false" />
           <Property Name="thumbnail" Type="varbinary(max)" Nullable="false" />
-          <Property Name="date" Type="datetime2" Precision="7" Nullable="false" />
+          <Property Name="date" Type="datetime" Nullable="false" />
         </EntityType>
         <EntityType Name="events">
           <Key>
@@ -23,14 +23,15 @@
           <Property Name="event" Type="nvarchar(max)" />
           <Property Name="data" Type="text" />
         </EntityType>
-        <EntityContainer Name="maison_connecte2ModelStoreContainer">
+        <EntityContainer Name="maisonConnecteModelStoreContainer">
           <EntitySet Name="enregistrement" EntityType="Self.enregistrement" Schema="dbo" store:Type="Tables" />
           <EntitySet Name="events" EntityType="Self.events" Schema="dbo" store:Type="Tables" />
         </EntityContainer>
-      </Schema></edmx:StorageModels>
+      </Schema>
+    </edmx:StorageModels>
     <!-- CSDL content -->
     <edmx:ConceptualModels>
-      <Schema Namespace="maison_connecte2Model" Alias="Self" annotation:UseStrongSpatialTypes="false" xmlns:annotation="http://schemas.microsoft.com/ado/2009/02/edm/annotation" xmlns:customannotation="http://schemas.microsoft.com/ado/2013/11/edm/customannotation" xmlns="http://schemas.microsoft.com/ado/2009/11/edm">
+      <Schema Namespace="maisonConnecteModel" Alias="Self" annotation:UseStrongSpatialTypes="false" xmlns:annotation="http://schemas.microsoft.com/ado/2009/02/edm/annotation" xmlns:customannotation="http://schemas.microsoft.com/ado/2013/11/edm/customannotation" xmlns="http://schemas.microsoft.com/ado/2009/11/edm">
         <EntityType Name="enregistrement">
           <Key>
             <PropertyRef Name="id" />
@@ -38,7 +39,7 @@
           <Property Name="id" Type="Int64" Nullable="false" annotation:StoreGeneratedPattern="Identity" />
           <Property Name="flux_video" Type="Binary" MaxLength="Max" FixedLength="false" Nullable="false" />
           <Property Name="thumbnail" Type="Binary" MaxLength="Max" FixedLength="false" Nullable="false" />
-          <Property Name="date" Type="DateTime" Nullable="false" Precision="7" />
+          <Property Name="date" Type="DateTime" Nullable="false" Precision="3" />
         </EntityType>
         <EntityType Name="event">
           <Key>
@@ -49,7 +50,7 @@
           <Property Name="event1" Type="String" MaxLength="Max" FixedLength="false" Unicode="true" />
           <Property Name="data" Type="String" MaxLength="Max" FixedLength="false" Unicode="false" />
         </EntityType>
-        <EntityContainer Name="maison_connecte2Entities" annotation:LazyLoadingEnabled="true">
+        <EntityContainer Name="maisonConnecteEntities" annotation:LazyLoadingEnabled="true">
           <EntitySet Name="enregistrements" EntityType="Self.enregistrement" />
           <EntitySet Name="events" EntityType="Self.event" />
         </EntityContainer>
@@ -58,9 +59,9 @@
     <!-- C-S mapping content -->
     <edmx:Mappings>
       <Mapping Space="C-S" xmlns="http://schemas.microsoft.com/ado/2009/11/mapping/cs">
-        <EntityContainerMapping StorageEntityContainer="maison_connecte2ModelStoreContainer" CdmEntityContainer="maison_connecte2Entities">
+        <EntityContainerMapping StorageEntityContainer="maisonConnecteModelStoreContainer" CdmEntityContainer="maisonConnecteEntities">
           <EntitySetMapping Name="enregistrements">
-            <EntityTypeMapping TypeName="maison_connecte2Model.enregistrement">
+            <EntityTypeMapping TypeName="maisonConnecteModel.enregistrement">
               <MappingFragment StoreEntitySet="enregistrement">
                 <ScalarProperty Name="id" ColumnName="id" />
                 <ScalarProperty Name="flux_video" ColumnName="flux_video" />
@@ -70,7 +71,7 @@
             </EntityTypeMapping>
           </EntitySetMapping>
           <EntitySetMapping Name="events">
-            <EntityTypeMapping TypeName="maison_connecte2Model.event">
+            <EntityTypeMapping TypeName="maisonConnecteModel.event">
               <MappingFragment StoreEntitySet="events">
                 <ScalarProperty Name="id" ColumnName="id" />
                 <ScalarProperty Name="date" ColumnName="date" />

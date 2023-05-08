@@ -17,8 +17,6 @@ using System.Net;
 using MQTTnet;
 using MQTTnet.Client;
 using MQTTnet.Exceptions;
-using MQTTnet.Packets;
-using MQTTnet.Protocol;
 
 namespace CameraCSharpFramework
 {
@@ -58,8 +56,7 @@ namespace CameraCSharpFramework
         private static bool videoRecording = false;
         private static string receivedMessage;
 
-
-        string connectionString = "Server=PAUM;Database=maison_connecte;User Id=userMaison;Password=123Maison.;";
+        string connectionString = "Server=paum\\paum;Database=maisonConnecte;User Id=userMaison;Password=123Maison.;";
 
         private static readonly object _syncLock = new object();
 
@@ -163,7 +160,7 @@ namespace CameraCSharpFramework
             videoRecording = true;
             string outputFilePath = nomVideo;
 
-            videoFileWriter.Open(outputFilePath, 640, 480, framesPerSecond, VideoCodec.Default, 1000000);      
+            videoFileWriter.Open(outputFilePath, 1280, 720, framesPerSecond, VideoCodec.Default, 1000000);      
         }
 
         private void debugThread()
@@ -381,13 +378,14 @@ namespace CameraCSharpFramework
                     byte[] videoBytes = GetVideoBytes(nomVideo);
 
                     // Execute a simple query
-                    var context = new maison_connecte2Entities();
+                    var context = new maisonConnecteEntities();
 
                     // Create a new enregistrements object
                     var newRecord = new enregistrement
                     {
                         flux_video = videoBytes,
                         thumbnail = thumbnail,
+                        date = DateTime.Now,
                     };
 
                     // Add the new enregistrements object to the enregistrements DbSet
