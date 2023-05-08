@@ -1,0 +1,105 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<edmx:Edmx Version="3.0" xmlns:edmx="http://schemas.microsoft.com/ado/2009/11/edmx">
+  <!-- EF Runtime content -->
+  <edmx:Runtime>
+    <!-- SSDL content -->
+    <edmx:StorageModels>
+    <Schema Namespace="maison_connecte2Model.Store" Provider="System.Data.SqlClient" ProviderManifestToken="2012" Alias="Self" xmlns:store="http://schemas.microsoft.com/ado/2007/12/edm/EntityStoreSchemaGenerator" xmlns:customannotation="http://schemas.microsoft.com/ado/2013/11/edm/customannotation" xmlns="http://schemas.microsoft.com/ado/2009/11/edm/ssdl">
+        <EntityType Name="enregistrement">
+          <Key>
+            <PropertyRef Name="id" />
+          </Key>
+          <Property Name="id" Type="bigint" StoreGeneratedPattern="Identity" Nullable="false" />
+          <Property Name="flux_video" Type="varbinary(max)" Nullable="false" />
+          <Property Name="thumbnail" Type="varbinary(max)" Nullable="false" />
+          <Property Name="date" Type="datetime2" Precision="7" Nullable="false" />
+        </EntityType>
+        <EntityType Name="events">
+          <Key>
+            <PropertyRef Name="id" />
+          </Key>
+          <Property Name="id" Type="bigint" StoreGeneratedPattern="Identity" Nullable="false" />
+          <Property Name="date" Type="datetime" Nullable="false" />
+          <Property Name="event" Type="nvarchar(max)" />
+          <Property Name="data" Type="text" />
+        </EntityType>
+        <EntityContainer Name="maison_connecte2ModelStoreContainer">
+          <EntitySet Name="enregistrement" EntityType="Self.enregistrement" Schema="dbo" store:Type="Tables" />
+          <EntitySet Name="events" EntityType="Self.events" Schema="dbo" store:Type="Tables" />
+        </EntityContainer>
+      </Schema></edmx:StorageModels>
+    <!-- CSDL content -->
+    <edmx:ConceptualModels>
+      <Schema Namespace="maison_connecte2Model" Alias="Self" annotation:UseStrongSpatialTypes="false" xmlns:annotation="http://schemas.microsoft.com/ado/2009/02/edm/annotation" xmlns:customannotation="http://schemas.microsoft.com/ado/2013/11/edm/customannotation" xmlns="http://schemas.microsoft.com/ado/2009/11/edm">
+        <EntityType Name="enregistrement">
+          <Key>
+            <PropertyRef Name="id" />
+          </Key>
+          <Property Name="id" Type="Int64" Nullable="false" annotation:StoreGeneratedPattern="Identity" />
+          <Property Name="flux_video" Type="Binary" MaxLength="Max" FixedLength="false" Nullable="false" />
+          <Property Name="thumbnail" Type="Binary" MaxLength="Max" FixedLength="false" Nullable="false" />
+          <Property Name="date" Type="DateTime" Nullable="false" Precision="7" />
+        </EntityType>
+        <EntityType Name="event">
+          <Key>
+            <PropertyRef Name="id" />
+          </Key>
+          <Property Name="id" Type="Int64" Nullable="false" annotation:StoreGeneratedPattern="Identity" />
+          <Property Name="date" Type="DateTime" Nullable="false" Precision="3" />
+          <Property Name="event1" Type="String" MaxLength="Max" FixedLength="false" Unicode="true" />
+          <Property Name="data" Type="String" MaxLength="Max" FixedLength="false" Unicode="false" />
+        </EntityType>
+        <EntityContainer Name="maison_connecte2Entities" annotation:LazyLoadingEnabled="true">
+          <EntitySet Name="enregistrements" EntityType="Self.enregistrement" />
+          <EntitySet Name="events" EntityType="Self.event" />
+        </EntityContainer>
+      </Schema>
+    </edmx:ConceptualModels>
+    <!-- C-S mapping content -->
+    <edmx:Mappings>
+      <Mapping Space="C-S" xmlns="http://schemas.microsoft.com/ado/2009/11/mapping/cs">
+        <EntityContainerMapping StorageEntityContainer="maison_connecte2ModelStoreContainer" CdmEntityContainer="maison_connecte2Entities">
+          <EntitySetMapping Name="enregistrements">
+            <EntityTypeMapping TypeName="maison_connecte2Model.enregistrement">
+              <MappingFragment StoreEntitySet="enregistrement">
+                <ScalarProperty Name="id" ColumnName="id" />
+                <ScalarProperty Name="flux_video" ColumnName="flux_video" />
+                <ScalarProperty Name="thumbnail" ColumnName="thumbnail" />
+                <ScalarProperty Name="date" ColumnName="date" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+          <EntitySetMapping Name="events">
+            <EntityTypeMapping TypeName="maison_connecte2Model.event">
+              <MappingFragment StoreEntitySet="events">
+                <ScalarProperty Name="id" ColumnName="id" />
+                <ScalarProperty Name="date" ColumnName="date" />
+                <ScalarProperty Name="event1" ColumnName="event" />
+                <ScalarProperty Name="data" ColumnName="data" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+        </EntityContainerMapping>
+      </Mapping>
+    </edmx:Mappings>
+  </edmx:Runtime>
+  <!-- EF Designer content (DO NOT EDIT MANUALLY BELOW HERE) -->
+  <Designer xmlns="http://schemas.microsoft.com/ado/2009/11/edmx">
+    <Connection>
+      <DesignerInfoPropertySet>
+        <DesignerProperty Name="MetadataArtifactProcessing" Value="EmbedInOutputAssembly" />
+      </DesignerInfoPropertySet>
+    </Connection>
+    <Options>
+      <DesignerInfoPropertySet>
+        <DesignerProperty Name="ValidateOnBuild" Value="true" />
+        <DesignerProperty Name="EnablePluralization" Value="true" />
+        <DesignerProperty Name="IncludeForeignKeysInModel" Value="true" />
+        <DesignerProperty Name="UseLegacyProvider" Value="false" />
+        <DesignerProperty Name="CodeGenerationStrategy" Value="None" />
+      </DesignerInfoPropertySet>
+    </Options>
+    <!-- Diagram content (shape and connector positions) -->
+    <Diagrams></Diagrams>
+  </Designer>
+</edmx:Edmx>

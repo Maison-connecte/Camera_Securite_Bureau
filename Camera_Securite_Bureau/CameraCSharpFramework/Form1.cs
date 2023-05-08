@@ -22,7 +22,7 @@ using MQTTnet.Protocol;
 
 namespace CameraCSharpFramework
 {
-    public partial class Form1 : Form
+    public partial class camera_securite_bureau : Form
     {
         //constante pour connecté a mqtt et au topic
         public static string nomServeur = "test.mosquitto.org";
@@ -52,17 +52,18 @@ namespace CameraCSharpFramework
         private static int pictureBoxHeight = 0;
 
         private static byte[] thumbnail = null;
-        private static bool premierEnregistrement = true;
         private static VideoFileWriter videoFileWriter;
         private static string nomVideo = "temp.mp4";
-        private static bool videoFiniEnregistre = false;
         //quand recois message MQTT mettre true
         private static bool videoRecording = false;
         private static string receivedMessage;
 
+
+        string connectionString = "Server=PAUM;Database=maison_connecte;User Id=userMaison;Password=123Maison.;";
+
         private static readonly object _syncLock = new object();
 
-        public Form1()
+        public camera_securite_bureau()
         {
             InitializeComponent();
         }
@@ -157,14 +158,12 @@ namespace CameraCSharpFramework
 
         private static void StartRecording()
         {
-            string outputFilePath = nomVideo;
-
-            videoFileWriter.Open(outputFilePath, 640, 480, framesPerSecond, VideoCodec.Default, 1000000);
-
             // Reset the recordedFrames counter
             recordedFrames = 0;
             videoRecording = true;
-            videoFiniEnregistre = false;
+            string outputFilePath = nomVideo;
+
+            videoFileWriter.Open(outputFilePath, 640, 480, framesPerSecond, VideoCodec.Default, 1000000);      
         }
 
         private void debugThread()
@@ -291,12 +290,10 @@ namespace CameraCSharpFramework
         }
         private void StopRecording()
         {
-            videoFiniEnregistre = true;
             videoRecording = false;
+            receivedMessage = "";
             // Close the VideoFileWriter instance
             videoFileWriter.Close();
-
-            MessageBox.Show("Recording finished. The video file has been saved.", "Recording Finished", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         static byte[] GetVideoBytes(string videoFilePath)
         {
@@ -314,14 +311,13 @@ namespace CameraCSharpFramework
         {
             image = (Bitmap)eventArgs.Frame.Clone();
 
-            if ((videoFiniEnregistre == true && videoRecording == false && receivedMessage == "1") || premierEnregistrement == true)
+            if (videoRecording == false && receivedMessage == "1")
             {
-                premierEnregistrement = false;
                 StartRecording();
             }
 
             // Stop recording after reaching the desired number of frames
-            if (recordedFrames == totalFramesToRecord && videoFiniEnregistre == false && videoRecording == true)
+            if (recordedFrames == totalFramesToRecord && videoRecording == true)
             {
                 StopRecording();
                 sauvegardeVideoDansBD();
@@ -339,9 +335,7 @@ namespace CameraCSharpFramework
                 }
             }
 
-
-
-            if (videoFiniEnregistre == false && videoRecording == true)
+            if (videoRecording == true)
             {
                 recordedFrames++;
                 // Save frames to the VideoFileWriter while capturing frames
@@ -379,23 +373,31 @@ namespace CameraCSharpFramework
 
         private void sauvegardeVideoDansBD()
         {
-                byte[] videoBytes = GetVideoBytes(nomVideo);
-
-                // Execute a simple query
-                var context = new Maison_connecteEntities();
-
-                // Create a new enregistrements object
-                var newRecord = new enregistrement
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
                 {
-                    flux_video = videoBytes,
-                    thumbnail = thumbnail
-                };
+                    connection.Open();
 
-                // Add the new enregistrements object to the enregistrements DbSet
-                context.enregistrements.Add(newRecord);
+                    byte[] videoBytes = GetVideoBytes(nomVideo);
 
-                // Save changes to the database
-                context.SaveChanges();
+                    // Execute a simple query
+                    var context = new maison_connecte2Entities();
+
+                    // Create a new enregistrements object
+                    var newRecord = new enregistrement
+                    {
+                        flux_video = videoBytes,
+                        thumbnail = thumbnail,
+                    };
+
+                    // Add the new enregistrements object to the enregistrements DbSet
+                    context.enregistrements.Add(newRecord);
+
+                    // Save changes to the database
+                    context.SaveChanges();
+                }
+            }
+           
             try
                 {
                     File.Delete(nomVideo);

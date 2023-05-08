@@ -1,6 +1,6 @@
 ﻿namespace CameraCSharpFramework
 {
-    partial class Form1
+    partial class camera_securite_bureau
     {
         /// <summary>
         /// Variable nécessaire au concepteur.
@@ -50,7 +50,7 @@
             this.comboBox1.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.comboBox1.FormattingEnabled = true;
             this.comboBox1.Location = new System.Drawing.Point(85, 7);
-            this.comboBox1.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.comboBox1.Margin = new System.Windows.Forms.Padding(4);
             this.comboBox1.Name = "comboBox1";
             this.comboBox1.Size = new System.Drawing.Size(540, 24);
             this.comboBox1.TabIndex = 1;
@@ -58,7 +58,7 @@
             // button1
             // 
             this.button1.Location = new System.Drawing.Point(635, 7);
-            this.button1.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.button1.Margin = new System.Windows.Forms.Padding(4);
             this.button1.Name = "button1";
             this.button1.Size = new System.Drawing.Size(100, 28);
             this.button1.TabIndex = 2;
@@ -69,13 +69,13 @@
             // pictureBox1
             // 
             this.pictureBox1.Location = new System.Drawing.Point(20, 41);
-            this.pictureBox1.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.pictureBox1.Margin = new System.Windows.Forms.Padding(4);
             this.pictureBox1.Name = "pictureBox1";
             this.pictureBox1.Size = new System.Drawing.Size(1008, 613);
             this.pictureBox1.TabIndex = 3;
             this.pictureBox1.TabStop = false;
             // 
-            // Form1
+            // camera_securite_bureau
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
@@ -84,10 +84,11 @@
             this.Controls.Add(this.button1);
             this.Controls.Add(this.comboBox1);
             this.Controls.Add(this.label1);
-            this.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
-            this.Name = "Form1";
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
+            this.Margin = new System.Windows.Forms.Padding(4);
+            this.Name = "camera_securite_bureau";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-            this.Text = "Form1";
+            this.Text = "camera_securite_bureau";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.Form1_FormClosing);
             this.Load += new System.EventHandler(this.Form1_Load);
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
