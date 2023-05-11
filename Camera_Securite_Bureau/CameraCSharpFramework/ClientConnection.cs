@@ -12,5 +12,6 @@ namespace CameraCSharpFramework
     {
         public Socket ClientSocket { get; set; }
         public Thread ClientThread { get; set; }
+        public string ClientType { get; set; }
     }
 }

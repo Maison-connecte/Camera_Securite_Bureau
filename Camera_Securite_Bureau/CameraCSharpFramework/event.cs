@@ -12,11 +12,11 @@ namespace CameraCSharpFramework
     using System;
     using System.Collections.Generic;
     
-    public partial class enregistrement
+    public partial class @event
     {
         public long id { get; set; }
-        public byte[] flux_video { get; set; }
-        public byte[] thumbnail { get; set; }
         public System.DateTime date { get; set; }
+        public string event1 { get; set; }
+        public string data { get; set; }
     }
 }

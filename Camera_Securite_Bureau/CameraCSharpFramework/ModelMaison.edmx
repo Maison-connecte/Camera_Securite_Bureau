@@ -4,46 +4,79 @@
   <edmx:Runtime>
     <!-- SSDL content -->
     <edmx:StorageModels>
-    <Schema Namespace="MaisonConnecteModel.Store" Provider="System.Data.SqlClient" ProviderManifestToken="2012" Alias="Self" xmlns:store="http://schemas.microsoft.com/ado/2007/12/edm/EntityStoreSchemaGenerator" xmlns:customannotation="http://schemas.microsoft.com/ado/2013/11/edm/customannotation" xmlns="http://schemas.microsoft.com/ado/2009/11/edm/ssdl">
+      <Schema Namespace="maisonConnecteModel.Store" Provider="System.Data.SqlClient" ProviderManifestToken="2012" Alias="Self" xmlns:store="http://schemas.microsoft.com/ado/2007/12/edm/EntityStoreSchemaGenerator" xmlns:customannotation="http://schemas.microsoft.com/ado/2013/11/edm/customannotation" xmlns="http://schemas.microsoft.com/ado/2009/11/edm/ssdl">
         <EntityType Name="enregistrement">
           <Key>
             <PropertyRef Name="id" />
           </Key>
           <Property Name="id" Type="bigint" StoreGeneratedPattern="Identity" Nullable="false" />
           <Property Name="flux_video" Type="varbinary(max)" Nullable="false" />
-          <Property Name="date" Type="date" />
+          <Property Name="thumbnail" Type="varbinary(max)" Nullable="false" />
+          <Property Name="date" Type="datetime" Nullable="false" />
         </EntityType>
-        <EntityContainer Name="MaisonConnecteModelStoreContainer">
+        <EntityType Name="events">
+          <Key>
+            <PropertyRef Name="id" />
+          </Key>
+          <Property Name="id" Type="bigint" StoreGeneratedPattern="Identity" Nullable="false" />
+          <Property Name="date" Type="datetime" Nullable="false" />
+          <Property Name="event" Type="nvarchar(max)" />
+          <Property Name="data" Type="text" />
+        </EntityType>
+        <EntityContainer Name="maisonConnecteModelStoreContainer">
           <EntitySet Name="enregistrement" EntityType="Self.enregistrement" Schema="dbo" store:Type="Tables" />
+          <EntitySet Name="events" EntityType="Self.events" Schema="dbo" store:Type="Tables" />
         </EntityContainer>
       </Schema>
     </edmx:StorageModels>
     <!-- CSDL content -->
     <edmx:ConceptualModels>
-      <Schema Namespace="MaisonConnecteModel" Alias="Self" annotation:UseStrongSpatialTypes="false" xmlns:annotation="http://schemas.microsoft.com/ado/2009/02/edm/annotation" xmlns:customannotation="http://schemas.microsoft.com/ado/2013/11/edm/customannotation" xmlns="http://schemas.microsoft.com/ado/2009/11/edm">
+      <Schema Namespace="maisonConnecteModel" Alias="Self" annotation:UseStrongSpatialTypes="false" xmlns:annotation="http://schemas.microsoft.com/ado/2009/02/edm/annotation" xmlns:customannotation="http://schemas.microsoft.com/ado/2013/11/edm/customannotation" xmlns="http://schemas.microsoft.com/ado/2009/11/edm">
         <EntityType Name="enregistrement">
           <Key>
             <PropertyRef Name="id" />
           </Key>
           <Property Name="id" Type="Int64" Nullable="false" annotation:StoreGeneratedPattern="Identity" />
           <Property Name="flux_video" Type="Binary" MaxLength="Max" FixedLength="false" Nullable="false" />
-          <Property Name="date" Type="DateTime" Precision="0" />
+          <Property Name="thumbnail" Type="Binary" MaxLength="Max" FixedLength="false" Nullable="false" />
+          <Property Name="date" Type="DateTime" Nullable="false" Precision="3" />
         </EntityType>
-        <EntityContainer Name="MaisonConnecteEntities" annotation:LazyLoadingEnabled="true">
-          <EntitySet Name="enregistrement" EntityType="Self.enregistrement" />
+        <EntityType Name="event">
+          <Key>
+            <PropertyRef Name="id" />
+          </Key>
+          <Property Name="id" Type="Int64" Nullable="false" annotation:StoreGeneratedPattern="Identity" />
+          <Property Name="date" Type="DateTime" Nullable="false" Precision="3" />
+          <Property Name="event1" Type="String" MaxLength="Max" FixedLength="false" Unicode="true" />
+          <Property Name="data" Type="String" MaxLength="Max" FixedLength="false" Unicode="false" />
+        </EntityType>
+        <EntityContainer Name="maisonConnecteEntities" annotation:LazyLoadingEnabled="true">
+          <EntitySet Name="enregistrements" EntityType="Self.enregistrement" />
+          <EntitySet Name="events" EntityType="Self.event" />
         </EntityContainer>
       </Schema>
     </edmx:ConceptualModels>
     <!-- C-S mapping content -->
     <edmx:Mappings>
       <Mapping Space="C-S" xmlns="http://schemas.microsoft.com/ado/2009/11/mapping/cs">
-        <EntityContainerMapping StorageEntityContainer="MaisonConnecteModelStoreContainer" CdmEntityContainer="MaisonConnecteEntities">
-          <EntitySetMapping Name="enregistrement">
-            <EntityTypeMapping TypeName="MaisonConnecteModel.enregistrement">
+        <EntityContainerMapping StorageEntityContainer="maisonConnecteModelStoreContainer" CdmEntityContainer="maisonConnecteEntities">
+          <EntitySetMapping Name="enregistrements">
+            <EntityTypeMapping TypeName="maisonConnecteModel.enregistrement">
               <MappingFragment StoreEntitySet="enregistrement">
                 <ScalarProperty Name="id" ColumnName="id" />
                 <ScalarProperty Name="flux_video" ColumnName="flux_video" />
+                <ScalarProperty Name="thumbnail" ColumnName="thumbnail" />
                 <ScalarProperty Name="date" ColumnName="date" />
+              </MappingFragment>
+            </EntityTypeMapping>
+          </EntitySetMapping>
+          <EntitySetMapping Name="events">
+            <EntityTypeMapping TypeName="maisonConnecteModel.event">
+              <MappingFragment StoreEntitySet="events">
+                <ScalarProperty Name="id" ColumnName="id" />
+                <ScalarProperty Name="date" ColumnName="date" />
+                <ScalarProperty Name="event1" ColumnName="event" />
+                <ScalarProperty Name="data" ColumnName="data" />
               </MappingFragment>
             </EntityTypeMapping>
           </EntitySetMapping>
@@ -61,10 +94,10 @@
     <Options>
       <DesignerInfoPropertySet>
         <DesignerProperty Name="ValidateOnBuild" Value="true" />
-        <DesignerProperty Name="EnablePluralization" Value="false" />
+        <DesignerProperty Name="EnablePluralization" Value="true" />
         <DesignerProperty Name="IncludeForeignKeysInModel" Value="true" />
         <DesignerProperty Name="UseLegacyProvider" Value="false" />
-        <DesignerProperty Name="CodeGenerationStrategy" Value="Aucun" />
+        <DesignerProperty Name="CodeGenerationStrategy" Value="None" />
       </DesignerInfoPropertySet>
     </Options>
     <!-- Diagram content (shape and connector positions) -->
