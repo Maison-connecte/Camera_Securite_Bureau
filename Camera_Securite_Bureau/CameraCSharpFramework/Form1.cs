@@ -12,53 +12,55 @@ using System.IO;
 using System.Diagnostics;
 using Accord.Video.FFMPEG;
 using System.Threading;
-using System.Data.SqlClient;
 using System.Net;
 using MQTTnet;
 using MQTTnet.Client;
 using MQTTnet.Exceptions;
+using System.Linq;
+using CameraCSharpFramework.Database;
+using MQTTnet.Protocol;
 
 namespace CameraCSharpFramework
 {
     public partial class camera_securite_bureau : Form
     {
-        //constante pour connecté a mqtt et au topic
+        // variables pour connecter à MQTT et au topic
         public static string nomServeur = "test.mosquitto.org";
         public static int portServeur = 1883;
-        private static IMqttClient _mqttClient;
-        private static string nomTopic = "capteur_ultrason";
+        private static IMqttClient _clientMqtt;
+        private static string SujetCapteurUltrason = "capteur_ultrason";
+        private static string SujetLumiere = "allumer_led_divertissement";
+        private static string SujetCouleur = "couleur_led_divertissement";
         //------------------------------------------------------
         private Bitmap image;
-        private Bitmap resizedImage;
+        private Bitmap imageRedimensionnee;
         //variable pour dire aux thread du socket darreter de fonctionner
-        private CancellationTokenSource broadcastCancellationTokenSource;
+        private CancellationTokenSource sourceAnnulationDiffusion;
         //Trouve les cameras sur l'ordinateur
-        private FilterInfoCollection videoDevices;
+        private FilterInfoCollection peripheriquesVideo;
         //driver directShow
-        private VideoCaptureDevice videoCaptureDevice;
-        //donné à envoyer au socket
+        private VideoCaptureDevice peripheriqueCaptureVideo;
+        //Données à envoyer au socket
         private static string imageBase64 = string.Empty;
         //Connection du client
         private static List<ClientConnection> clients = new List<ClientConnection>();
         
-        //Calcule le nombre de frame a enregistré
-        private static int recordedFrames = 0;
-        private const int framesPerSecond = 30;
-        private const int desiredVideoLengthSeconds = 1 * 10; // 5 minutes in seconds
-        private const int totalFramesToRecord = framesPerSecond * desiredVideoLengthSeconds;
-        private static int pictureBoxWidth = 0;
-        private static int pictureBoxHeight = 0;
+        //Calcule le nombre d'image a enregistré
+        private static int imagesEnregistrees = 0;
+        private const int imagesParSeconde = 30;
+        private const int dureeVideoSouhaiteeSecondes = 1 * 10; // 5 minutes in seconds
+        private const int totalFramesAEnregistrer = imagesParSeconde * dureeVideoSouhaiteeSecondes;
+        private static int largeurPictureBox = 0;
+        private static int hauteurPictureBox = 0;
 
-        private static byte[] thumbnail = null;
-        private static VideoFileWriter videoFileWriter;
+        private static byte[] miniatureSiteWeb = null;
+        private static VideoFileWriter ecriveurFichierVideo;
         private static string nomVideo = "temp.mp4";
-        //quand recois message MQTT mettre true
-        private static bool videoRecording = false;
-        private static string receivedMessage;
+        //Quand reçoit un message MQTT, mettre à true
+        private static bool enregistrementVideo = false;
+        private static string messageRecu;
 
-        string connectionString = "Server=paum\\paum;Database=maisonConnecte;User Id=userMaison;Password=123Maison.;";
-
-        private static readonly object _syncLock = new object();
+        private static readonly object _verrouSynchro = new object();
 
         public camera_securite_bureau()
         {
@@ -66,133 +68,175 @@ namespace CameraCSharpFramework
         }
 
         //souscrit au topic et va lire les valeurs. Commence l'enregistrement lorsque porte ouverte.
-        public static async Task Subscribe_Topic()
+        public static async Task Souscrire_Topic()
         {
             try
             {
-                var mqttFactory = new MqttFactory();
-                _mqttClient = mqttFactory.CreateMqttClient();
+                var fabriqueMqtt = new MqttFactory();
+                _clientMqtt = fabriqueMqtt.CreateMqttClient();
 
-                var mqttClientOptions = new MqttClientOptionsBuilder().WithTcpServer(nomServeur, 1883).Build();
+                var optionsClientMqtt = new MqttClientOptionsBuilder().WithTcpServer(nomServeur, 1883).Build();
 
-                _mqttClient.ApplicationMessageReceivedAsync += (e) =>
+                _clientMqtt.ApplicationMessageReceivedAsync += (e) =>
                 {
-                    receivedMessage = Encoding.UTF8.GetString(e.ApplicationMessage.Payload);
-                    Debug.WriteLine($"Received message from topic '{e.ApplicationMessage.Topic}': {receivedMessage}");
+                    if (e.ApplicationMessage.Topic == SujetCapteurUltrason)
+                    {
+                        // Handle ultrasonic sensor message
+                        messageRecu = Encoding.UTF8.GetString(e.ApplicationMessage.Payload);
+                        Debug.WriteLine($"Message reçu du topic '{e.ApplicationMessage.Topic}': {messageRecu}");
+                    }
+                    else if (e.ApplicationMessage.Topic == SujetLumiere)
+                    {
+                        // exécute une requete simple
+                        var context = new maisonConnecteEntities();
 
+                        // création d'un objet enregistrement
+                        var newRecord = new @event
+                        {
+                            event1 = Encoding.UTF8.GetString(e.ApplicationMessage.Payload) == "1" ? EventEnum.LightOn : EventEnum.LightOff ,
+                            date = DateTime.Now
+                        };
+
+                        // ajoute objet enregistrement au data set
+                        context.events.Add(newRecord);
+
+                        // sauvegarde l'objet enregistrement dans la base de donnée
+                        context.SaveChanges();
+                    }
+                    else if (e.ApplicationMessage.Topic == SujetCouleur)
+                    {
+                        // exécute une requete simple
+                        var context = new maisonConnecteEntities();
+
+                        // création d'un objet enregistrement
+                        var newRecord = new @event
+                        {
+                            event1 = EventEnum.LEDColor,
+                            date = DateTime.Now
+                        };
+
+                        // ajoute objet enregistrement au data set
+                        context.events.Add(newRecord);
+
+                        // sauvegarde l'objet enregistrement dans la base de donnée
+                        context.SaveChanges();
+                    }
                     return Task.CompletedTask;
                 };
 
-                await _mqttClient.ConnectAsync(mqttClientOptions, CancellationToken.None);
+                await _clientMqtt.ConnectAsync(optionsClientMqtt, CancellationToken.None);
 
-                var mqttSubscribeOptions = mqttFactory.CreateSubscribeOptionsBuilder()
-                    .WithTopicFilter(
-                        f =>
-                        {
-                            f.WithTopic(nomTopic);
-                        })
+                var mqttSubscribeOptions = fabriqueMqtt.CreateSubscribeOptionsBuilder()
+                     .WithTopicFilter(
+                    f =>
+                    {
+                        f.WithTopic(SujetCapteurUltrason);
+                    })
+                .WithTopicFilter(
+                    f =>
+                    {
+                        f.WithTopic(SujetLumiere);
+                    })
+                .WithTopicFilter(
+                    f =>
+                    {
+                        f.WithTopic(SujetCouleur);
+                    })
                     .Build();
 
-                var response = await _mqttClient.SubscribeAsync(mqttSubscribeOptions, CancellationToken.None);
+                var response = await _clientMqtt.SubscribeAsync(mqttSubscribeOptions, CancellationToken.None);
 
-                Debug.WriteLine("MQTT client subscribed to topic.");
+                Debug.WriteLine("MQTT client souscrit au sujet.");
             }
             catch (MqttCommunicationException ex)
             {
-                Debug.WriteLine("An error occurred while communicating with the MQTT broker: " + ex.Message);
+                Debug.WriteLine("une erreur est survenue lors de la communication au courtier: " + ex.Message);
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("An error occurred: " + ex.Message);
+                Debug.WriteLine("une erreur s'est produite: " + ex.Message);
             }
         }
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            pictureBoxWidth = pictureBox1.Width;
-            pictureBoxHeight = pictureBox1.Height;
-            videoDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
+            largeurPictureBox = pictureBox1.Width;
+            hauteurPictureBox = pictureBox1.Height;
+            peripheriquesVideo = new FilterInfoCollection(FilterCategory.VideoInputDevice);
 
-            foreach (FilterInfo filterInfo in videoDevices)
+            foreach (FilterInfo filterInfo in peripheriquesVideo)
             {
                 comboBox1.Items.Add(filterInfo.Name);
             }
             comboBox1.SelectedIndex = 0;
 
-            videoCaptureDevice = new VideoCaptureDevice();
+            peripheriqueCaptureVideo = new VideoCaptureDevice();
 
-            CreateSocket();
+            CreerSocket();
 
-            videoCaptureDevice = new VideoCaptureDevice(videoDevices[0].MonikerString);
-            videoCaptureDevice.NewFrame += new NewFrameEventHandler(VideoCaptureDevice_NewFrame);
-            videoCaptureDevice.Start();
+            peripheriqueCaptureVideo = new VideoCaptureDevice(peripheriquesVideo[0].MonikerString);
+            peripheriqueCaptureVideo.NewFrame += new NewFrameEventHandler(PeripheriqueCaptureVideo_NouvelleImage);
+            // met la resolution a 1280x720
+            peripheriqueCaptureVideo.VideoResolution = peripheriqueCaptureVideo.VideoCapabilities
+       .FirstOrDefault(capability => capability.FrameSize.Equals(new Size(1280, 720)));
+
+            peripheriqueCaptureVideo.Start();
             // Initialize VideoFileWriter
-            videoFileWriter = new VideoFileWriter();
+            ecriveurFichierVideo = new VideoFileWriter();
 
             Task.Run(async () =>
             {
-                await Subscribe_Topic();
+                await Souscrire_Topic();
             });
         }
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
-            if (videoCaptureDevice != null && videoCaptureDevice.IsRunning)
+            if (peripheriqueCaptureVideo != null && peripheriqueCaptureVideo.IsRunning)
             {
-                videoCaptureDevice.SignalToStop();
-                videoCaptureDevice.WaitForStop();
-                videoCaptureDevice = null;
+                peripheriqueCaptureVideo.SignalToStop();
+                peripheriqueCaptureVideo.WaitForStop();
+                peripheriqueCaptureVideo = null;
             }
 
-            if (videoFileWriter != null)
+            if (ecriveurFichierVideo != null)
             {
-                videoFileWriter.Close();
-                videoFileWriter.Dispose();
+                ecriveurFichierVideo.Close();
+                ecriveurFichierVideo.Dispose();
             }
 
-            StopBroadcastTask();
+            ArreterTacheDiffusion();
         }
 
-        private static void StartRecording()
+        private static void DemarrerEnregistrement()
         {
-            // Reset the recordedFrames counter
-            recordedFrames = 0;
-            videoRecording = true;
-            string outputFilePath = nomVideo;
+            // Réinitialise le compteur de frames enregistrées
+            imagesEnregistrees = 0;
+            enregistrementVideo = true;
+            string cheminFichierSortie = nomVideo;
+            sauvegardeEvenementDansBD();
 
-            videoFileWriter.Open(outputFilePath, 1280, 720, framesPerSecond, VideoCodec.Default, 1000000);      
+            ecriveurFichierVideo.Open(cheminFichierSortie, 1280, 720, imagesParSeconde, VideoCodec.Default, 1000000);      
         }
 
-        private void debugThread()
+        private void ArreterTacheDiffusion()
         {
-            Process process = Process.GetCurrentProcess();
-            Debug.WriteLine("Active threads when closing the form:");
-            foreach (ProcessThread thread in process.Threads)
+            if (sourceAnnulationDiffusion != null)
             {
-                Debug.WriteLine($"Thread ID: {thread.Id}, State: {thread.ThreadState}, Start Time: {thread.StartTime}");
+                sourceAnnulationDiffusion.Cancel();
+                sourceAnnulationDiffusion.Dispose();
+                sourceAnnulationDiffusion = null;
             }
         }
-
-        private void StopBroadcastTask()
+        public static void Diffuser()
         {
-            if (broadcastCancellationTokenSource != null)
-            {
-                broadcastCancellationTokenSource.Cancel();
-                broadcastCancellationTokenSource.Dispose();
-                broadcastCancellationTokenSource = null;
-            }
-        }
-        public static void Broadcast()
-        {
-            //Debug.WriteLine("broadcasting");
+            // Ajouter le délimiteur "---END_OF_FRAME---" à imageBase64
+            string imageBase64AvecDelimiteur = imageBase64 + "---END_OF_FRAME---";
 
-            // Add the "---END_OF_FRAME---" delimiter to imageBase64
-            string imageBase64WithDelimiter = imageBase64 + "---END_OF_FRAME---";
+            byte[] octetsMessage = Encoding.ASCII.GetBytes(imageBase64AvecDelimiteur);
+            ClientConnection connexion;
 
-            byte[] messageBytes = Encoding.ASCII.GetBytes(imageBase64WithDelimiter);
-            ClientConnection connection;
-
-            lock (_syncLock)
+            lock (_verrouSynchro)
             {
                 for (int i = 0; i < clients.Count; i++)
                 {
@@ -200,159 +244,155 @@ namespace CameraCSharpFramework
                     {
                         continue;
                     }
-                    connection = clients[i];
+                    connexion = clients[i];
                     try
                     {
-                        connection.ClientSocket.Send(messageBytes);
+                        connexion.ClientSocket.Send(octetsMessage);
                     }
                     catch (SocketException)
                     {
-                        HandleClientConnection(connection);
+                        GererConnexionClient(connexion);
                     }
                 }
             }
         }
 
-        private static void HandleClientConnection(ClientConnection connection)
+        private static void GererConnexionClient(ClientConnection connexion)
         {
-            Debug.WriteLine($"Client connection: {connection}");
-            // Handle the client connection here
-            // (e.g., receive data, process requests, etc.)
-            // This example only shows broadcasting a string to clients
+            Debug.WriteLine($"Connexion client: {connexion}");
 
-            // Cleanup
-            //Debug.WriteLine("remove client");
-            connection.ClientSocket.Close();
-            lock (_syncLock)
+            // Nettoyage
+            Debug.WriteLine("client supprimer");
+            connexion.ClientSocket.Close();
+            lock (_verrouSynchro)
             {
-                clients.Remove(connection);
+                clients.Remove(connexion);
             }
         }
 
-
-        private void CreateSocket()
+        private void CreerSocket()
         {
-            Debug.WriteLine("Socket created");
-            broadcastCancellationTokenSource = new CancellationTokenSource();
-            var token = broadcastCancellationTokenSource.Token;
+            Debug.WriteLine("Socket créé");
+            sourceAnnulationDiffusion = new CancellationTokenSource();
+            var jeton = sourceAnnulationDiffusion.Token;
 
             Task.Run(() =>
             {
                 int port = 8010;
-                IPAddress ipAddress = IPAddress.Any;
+                IPAddress adresseIP = IPAddress.Any;
 
-                Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                IPEndPoint localEndPoint = new IPEndPoint(ipAddress, port);
-                serverSocket.Bind(localEndPoint);
-                serverSocket.Listen(10);
+                Socket serveurSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                IPEndPoint pointFinLocal = new IPEndPoint(adresseIP, port);
+                serveurSocket.Bind(pointFinLocal);
+                serveurSocket.Listen(10);
 
-                Debug.WriteLine($"Server is listening on {ipAddress}:{port}");
+                Debug.WriteLine($"Serveur écoute : {adresseIP}:{port}");
 
                 while (true)
                 {
-                    Socket clientSocket = serverSocket.Accept();
+                    Socket clientSocket = serveurSocket.Accept();
                     Debug.WriteLine("Client connected.");
 
-                    ClientConnection connection = new ClientConnection { ClientSocket = clientSocket };
+                    ClientConnection connexionClient = new ClientConnection { ClientSocket = clientSocket };
 
-                    lock (_syncLock)
+                    lock (_verrouSynchro)
                     {
-                        clients.Add(connection);
+                        clients.Add(connexionClient);
                     }
                 }
             });
 
-            //serverSocket.DataReceived += ServerSocket_DataReceived;
             Task.Run(async () =>
             {
-                while (!token.IsCancellationRequested)
+                while (!jeton.IsCancellationRequested)
                 {
-                    Broadcast();
+                    Diffuser();
                     await Task.Delay(1000 / 30);
                 }
             });
         }
         private void button1_Click(object sender, EventArgs e)
         {
-            if (videoCaptureDevice != null && videoCaptureDevice.IsRunning)
+            if (peripheriqueCaptureVideo != null && peripheriqueCaptureVideo.IsRunning)
             {
-                videoCaptureDevice.SignalToStop();
-                videoCaptureDevice.WaitForStop();
-                videoCaptureDevice = null;
+                peripheriqueCaptureVideo.SignalToStop();
+                peripheriqueCaptureVideo.WaitForStop();
+                peripheriqueCaptureVideo = null;
             }
-            videoCaptureDevice = new VideoCaptureDevice(videoDevices[comboBox1.SelectedIndex].MonikerString);
-            videoCaptureDevice.NewFrame += new NewFrameEventHandler(VideoCaptureDevice_NewFrame);
-            videoCaptureDevice.Start();
-            StartRecording();
+            peripheriqueCaptureVideo = new VideoCaptureDevice(peripheriquesVideo[comboBox1.SelectedIndex].MonikerString);
+            peripheriqueCaptureVideo.NewFrame += new NewFrameEventHandler(PeripheriqueCaptureVideo_NouvelleImage);
+            peripheriqueCaptureVideo.Start();
         }
-        private void StopRecording()
+        private void ArreterEnregistrement()
         {
-            videoRecording = false;
-            receivedMessage = "";
-            // Close the VideoFileWriter instance
-            videoFileWriter.Close();
+            enregistrementVideo = false;
+            messageRecu = "";
+            // Ferme l'instance de VideoFileWriter
+            ecriveurFichierVideo.Close();
         }
-        static byte[] GetVideoBytes(string videoFilePath)
+        static byte[] ObtenirOctetsVideo(string cheminFichierVideo)
         {
-            using (FileStream fileStream = new FileStream(videoFilePath, FileMode.Open, FileAccess.Read))
+            using (FileStream fluxFichier = new FileStream(cheminFichierVideo, FileMode.Open, FileAccess.Read))
             {
-                using (MemoryStream memoryStream = new MemoryStream())
+                using (MemoryStream fluxMemoire = new MemoryStream())
                 {
-                    fileStream.CopyTo(memoryStream);
-                    return memoryStream.ToArray();
+                    fluxFichier.CopyTo(fluxMemoire);
+                    return fluxMemoire.ToArray();
                 }
             }
         }
 
-        private void VideoCaptureDevice_NewFrame(object sender, NewFrameEventArgs eventArgs)
+        private void PeripheriqueCaptureVideo_NouvelleImage(object sender, NewFrameEventArgs eventArgs)
         {
             image = (Bitmap)eventArgs.Frame.Clone();
+            
 
-            if (videoRecording == false && receivedMessage == "1")
+            if (enregistrementVideo == false && messageRecu == "1")
             {
-                StartRecording();
+                DemarrerEnregistrement();
             }
 
-            // Stop recording after reaching the desired number of frames
-            if (recordedFrames == totalFramesToRecord && videoRecording == true)
+            // Arrête l'enregistrement après avoir atteint le nombre d'images souhaité
+            if (imagesEnregistrees == totalFramesAEnregistrer && enregistrementVideo == true)
             {
-                StopRecording();
+                ArreterEnregistrement();
                 sauvegardeVideoDansBD();
             }
-            //rendu à moitier ont enregistre le thumbnail et envois dans BD
-            else if (recordedFrames == (totalFramesToRecord/2))
+            // rendu à moitié on enregistre l'aperçu et on envoie dans la BD
+            else if (imagesEnregistrees == (totalFramesAEnregistrer/2))
             {
                 using (MemoryStream ms = new MemoryStream())
                 {
                     //sauvegarde l'image dans le buffer
                     image.Save(ms, ImageFormat.Jpeg);
 
-                    //convertit le memory stream dans un byte array
-                    thumbnail = ms.ToArray();
+                    // convertit le memory stream dans un tableau d'octets
+                    miniatureSiteWeb = ms.ToArray();
                 }
             }
 
-            if (videoRecording == true)
+            if (enregistrementVideo == true)
             {
-                recordedFrames++;
-                // Save frames to the VideoFileWriter while capturing frames
-                videoFileWriter.WriteVideoFrame(image);
+                imagesEnregistrees++;
+                // Sauvegarde des images dans l'instance de VideoFileWriter pendant la capture
+              
+                ecriveurFichierVideo.WriteVideoFrame(image);
             }
 
-            resizedImage = new Bitmap(pictureBoxWidth, pictureBoxHeight);
+            imageRedimensionnee = new Bitmap(largeurPictureBox, hauteurPictureBox);
 
-            using (Graphics graphics = Graphics.FromImage(resizedImage))
+            using (Graphics graphics = Graphics.FromImage(imageRedimensionnee))
             {
-                graphics.DrawImage(image, 0, 0, pictureBoxWidth, pictureBoxHeight);
+                graphics.DrawImage(image, 0, 0, largeurPictureBox, hauteurPictureBox);
             }
             
-            conversionToBase64(image);
+            ConversionEnBase64(image);
                 
             pictureBox1.Image?.Dispose();
-            pictureBox1.Image = resizedImage;
+            pictureBox1.Image = imageRedimensionnee;
           
         }
-        private void conversionToBase64(Bitmap image)
+        private void ConversionEnBase64(Bitmap image)
         {
             using (MemoryStream ms = new MemoryStream())
             {
@@ -365,46 +405,79 @@ namespace CameraCSharpFramework
 
                 imageBase64 = System.Text.Encoding.ASCII.GetString(utf8bytes);
             }
-            image.Dispose();
+            //image.Dispose();
+        }
+
+        private static void sauvegardeEvenementDansBD()
+        {
+            // exécute une requete simple
+            var context = new maisonConnecteEntities();
+
+            // création d'un objet enregistrement
+            var newRecord = new @event
+            {
+                event1 = EventEnum.DoorStatusChanged,
+                date = DateTime.Now
+            };
+
+            // ajoute objet enregistrement au data set
+            context.events.Add(newRecord);
+
+            // sauvegarde l'objet enregistrement dans la base de donnée
+            context.SaveChanges();
         }
 
         private void sauvegardeVideoDansBD()
-        {
-            using (SqlConnection connection = new SqlConnection(connectionString))
+        {                                    
+            byte[] video = ObtenirOctetsVideo(nomVideo);
+
+            // exécute une requete simple
+            var context = new maisonConnecteEntities();
+
+            // création d'un objet enregistrement
+            var newRecord = new enregistrement
             {
-                {
-                    connection.Open();
+                flux_video = video,
+                thumbnail = miniatureSiteWeb,
+                date = DateTime.Now,
+            };
 
-                    byte[] videoBytes = GetVideoBytes(nomVideo);
+            // ajoute objet enregistrement au data set
+            context.enregistrements.Add(newRecord);
 
-                    // Execute a simple query
-                    var context = new maisonConnecteEntities();
-
-                    // Create a new enregistrements object
-                    var newRecord = new enregistrement
-                    {
-                        flux_video = videoBytes,
-                        thumbnail = thumbnail,
-                        date = DateTime.Now,
-                    };
-
-                    // Add the new enregistrements object to the enregistrements DbSet
-                    context.enregistrements.Add(newRecord);
-
-                    // Save changes to the database
-                    context.SaveChanges();
-                }
-            }
-           
+            // sauvegarde l'objet enregistrement dans la base de donnée
+            context.SaveChanges();               
+                 
             try
                 {
                     File.Delete(nomVideo);
-                    Debug.WriteLine("File deleted successfully.");
+                    Debug.WriteLine("fichier supprimer avec succès.");
                 }
                 catch (IOException ex)
                 {
-                    Debug.WriteLine($"Error deleting file: {ex.Message}");
+                    Debug.WriteLine($"erreur lors de la supprimation du fichier: {ex.Message}");
                 }
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            // raffraichie les péripherique vidéos
+            peripheriquesVideo = new FilterInfoCollection(FilterCategory.VideoInputDevice);
+
+            // nettois le combo box
+            comboBox1.Items.Clear();
+
+            // ajoute les nouveaux objets au combo box
+            foreach (FilterInfo filterInfo in peripheriquesVideo)
+            {
+                comboBox1.Items.Add(filterInfo.Name);
+            }
+
+            // met automatiquement le premier objet à l'index
+            if (comboBox1.Items.Count > 0)
+            {
+                comboBox1.SelectedIndex = 0;
+            }
         }
     }
 }
