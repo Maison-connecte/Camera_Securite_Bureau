@@ -21,7 +21,7 @@ using CameraCSharpFramework.Database;
 /*----------------------------------------------------------------
  *  Auteur: Maxime Paulin
  *  
- *  Date de création: 22 Mars 2023à
+ *  Date de création: 22 Mars 2023
  *  
  *  Dernière date de modification: [2023-05-21]
  *  
