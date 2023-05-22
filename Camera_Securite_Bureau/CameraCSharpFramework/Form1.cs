@@ -18,7 +18,34 @@ using MQTTnet.Client;
 using MQTTnet.Exceptions;
 using System.Linq;
 using CameraCSharpFramework.Database;
-using MQTTnet.Protocol;
+/*----------------------------------------------------------------
+ *  Auteur: Maxime Paulin
+ *  
+ *  Date de création: 22 Mars 2023à
+ *  
+ *  Dernière date de modification: [2023-05-21]
+ *  
+ *  Description: Ce programme est un système de caméra de sécurité conçus en C# et le protocole MQTT.
+ *  
+ *  Il est conçu pour surveiller, contrôler et enregistrer le flux vidéo de différentes caméras connectées
+ *  dans un cadre de sécurité domestique. Il se connecte à un courtier MQTT (mosquito), en s'abonnant à des sujets liés à
+ *  un capteur à ultrasons, à la commande d'éclairage et aux changements de couleur de la bande lumineuse. Le programme gère également les connexions client,
+ *  diffusant des données vidéo sur des sockets aux clients connectés. Il fournit une interface utilisateur pour la sélection de la caméra
+ *  et gère également l'enregistrement des flux vidéo lors de la détection d'un intrue et les sauvegarde dans une base de données.
+ *----------------------------------------------------------------*/
+
+/*----------------------------------------------------------------
+ * Sources:
+ *  - Documentation officielle de Microsoft C#: https://docs.microsoft.com/fr-fr/dotnet/csharp/
+ *  - Documentation de la bibliothèque MQTTNet: https://github.com/chkr1011/MQTTnet
+ *  - Communauté Stack Overflow: https://stackoverflow.com/
+ *  - Accord pour le flux vidéo: http://accord-framework.net/
+ *  - Entity framework : https://learn.microsoft.com/en-us/ef/
+ *  - Sockets : https://learn.microsoft.com/en-us/dotnet/api/system.net.sockets?view=netframework-4.8
+ *  - LINQ C#: https://learn.microsoft.com/en-us/dotnet/csharp/programming-guide/concepts/linq/
+ *  - Chat GPTv4
+ *----------------------------------------------------------------*/
+
 
 namespace CameraCSharpFramework
 {
@@ -330,6 +357,8 @@ namespace CameraCSharpFramework
             // Ferme l'instance de VideoFileWriter
             ecriveurFichierVideo.Close();
         }
+
+        //Généré par chat gpt: Permet de prendre la vidéo et de prendre les octets pour les envoyer plus tard dans le blob dans la basse de données
         static byte[] ObtenirOctetsVideo(string cheminFichierVideo)
         {
             using (FileStream fluxFichier = new FileStream(cheminFichierVideo, FileMode.Open, FileAccess.Read))
@@ -381,6 +410,7 @@ namespace CameraCSharpFramework
 
             imageRedimensionnee = new Bitmap(largeurPictureBox, hauteurPictureBox);
 
+            //généré par chat gpt: Permet de "rezise" l'image trop grande pour que sa entre dans la picture box
             using (Graphics graphics = Graphics.FromImage(imageRedimensionnee))
             {
                 graphics.DrawImage(image, 0, 0, largeurPictureBox, hauteurPictureBox);
@@ -405,7 +435,6 @@ namespace CameraCSharpFramework
 
                 imageBase64 = System.Text.Encoding.ASCII.GetString(utf8bytes);
             }
-            //image.Dispose();
         }
 
         private static void sauvegardeEvenementDansBD()
